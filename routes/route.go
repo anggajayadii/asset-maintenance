@@ -18,24 +18,13 @@ func RegisterRoutes(router *gin.Engine) {
 		auth.POST("/register", controllers.Register)
 	}
 
-	// Users (Protected - Example only, bisa tambah middleware role check)
-	// users := router.Group("/users")
-	// users.Use(middleware.JWTAuthMiddleware())
-	// {
-	// 	users.GET("/", controllers.GetAllUsers)
-	// 	users.GET("/:id", controllers.GetUser)
-	// 	users.PUT("/:id", controllers.UpdateUser)
-	// 	users.DELETE("/:id", controllers.DeleteUser)
-	// }
-
-	// Inisialisasi dependencies
+	// Users (Admin Only)
 	userRepo := repositories.NewUserRepository(config.DB)
 	userService := services.NewUserService(userRepo)
 	userController := controllers.NewUserController(userService)
 
-	// Group route
 	users := router.Group("/users")
-	users.Use(middleware.JWTAuthMiddleware()) // Jika perlu auth
+	users.Use(middleware.JWTAuthMiddleware(), middleware.RoleBasedAuth()) // Tambahkan RBAC
 	{
 		users.GET("/", userController.GetAllUsers)
 		users.GET("/:id", userController.GetUser)
@@ -43,61 +32,47 @@ func RegisterRoutes(router *gin.Engine) {
 		users.DELETE("/:id", userController.DeleteUser)
 	}
 
-	// // Assets
-	// assets := router.Group("/assets")
-	// assets.Use(middleware.JWTAuthMiddleware())
-	// {
-	// 	assets.GET("/", controllers.GetAssets)
-	// 	assets.GET("/:id", controllers.GetAssetByID)
-	// 	assets.POST("/", controllers.CreateAsset)
-	// 	assets.PUT("/:id", controllers.UpdateAsset)
-	// 	assets.DELETE("/:id", controllers.DeleteAsset)
-	// }
-
-	// Inisialisasi dependencies
+	// Assets (Role-Specific)
 	assetRepo := repositories.NewAssetRepository(config.DB)
 	assetService := services.NewAssetService(assetRepo)
 	assetController := controllers.NewAssetController(assetService)
 
-	// Group route dengan middleware JWT
 	assets := router.Group("/assets")
-	assets.Use(middleware.JWTAuthMiddleware())
+	assets.Use(middleware.JWTAuthMiddleware(), middleware.RoleBasedAuth()) // Tambahkan RBAC
 	{
-		assets.GET("/", assetController.GetAssets)         // Method dari struct
-		assets.GET("/:id", assetController.GetAssetByID)   // Method dari struct
-		assets.POST("/", assetController.CreateAsset)      // Method dari struct
-		assets.PUT("/:id", assetController.UpdateAsset)    // Method dari struct
-		assets.DELETE("/:id", assetController.DeleteAsset) // Method dari struct
+		assets.GET("/", assetController.GetAssets)
+		assets.GET("/:id", assetController.GetAssetByID)
+		assets.POST("/", assetController.CreateAsset)
+		assets.PUT("/:id", assetController.UpdateAsset)
+		assets.DELETE("/:id", assetController.DeleteAsset)
 	}
 
-	// Maintenance
-	// maintenance := router.Group("/maintenance")
-	// maintenance.Use(middleware.JWTAuthMiddleware())
-	// {
-	// 	maintenance.GET("/", controllers.GetMaintenanceRecords)
-	// 	maintenance.GET("/:id", controllers.GetMaintenanceByID)
-	// 	maintenance.POST("/", controllers.CreateMaintenance)
-	// }
-
-	// Inisialisasi dependencies
+	// Maintenance (Role-Specific)
 	maintRepo := repositories.NewMaintenanceRepository(config.DB)
 	maintService := services.NewMaintenanceService(maintRepo)
 	maintController := controllers.NewMaintenanceController(maintService)
 
-	// Group route
 	maintenance := router.Group("/maintenance")
-	maintenance.Use(middleware.JWTAuthMiddleware()) // Jika perlu auth
+	maintenance.Use(middleware.JWTAuthMiddleware(), middleware.RoleBasedAuth()) // Tambahkan RBAC
 	{
 		maintenance.GET("/", maintController.GetRecords)
 		maintenance.GET("/:id", maintController.GetRecordByID)
 		maintenance.POST("/", maintController.CreateRecord)
 	}
 
-	// Asset History
-	history := router.Group("/history")
+	// Inisialisasi
+	historyRepo := repositories.NewAssetHistoryRepository(config.DB)
+	historyService := services.NewAssetHistoryService(historyRepo)
+	historyController := controllers.NewAssetHistoryController(historyService)
+
+	// Tambahkan ke route
+	history := router.Group("/assets/:asset_id/history")
 	history.Use(middleware.JWTAuthMiddleware())
 	{
-		history.GET("/", controllers.GetAssetHistories)
-		history.POST("/", controllers.AddAssetHistory)
+		history.GET("/", historyController.GetAssetHistories)
 	}
+
+	// In your router setup:
+	historyService := services.NewAssetHistoryService(repositories.NewAssetHistoryRepository(db))
+	router.Use(middleware.AssetHistoryMiddleware(historyService))
 }

@@ -1,28 +1,33 @@
 package controllers
 
 import (
-	"asset-maintenance/config"
-	"asset-maintenance/models"
+	"asset-maintenance/services"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-func GetAssetHistories(c *gin.Context) {
-	var histories []models.AssetHistory
-	config.DB.Preload("User").Preload("Asset").Find(&histories)
-	c.JSON(http.StatusOK, histories)
+type AssetHistoryController struct {
+	historyService services.AssetHistoryService
 }
 
-func AddAssetHistory(c *gin.Context) {
-	var history models.AssetHistory
-	if err := c.ShouldBindJSON(&history); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+func NewAssetHistoryController(historyService services.AssetHistoryService) *AssetHistoryController {
+	return &AssetHistoryController{historyService: historyService}
+}
+
+func (ctrl *AssetHistoryController) GetAssetHistories(c *gin.Context) {
+	assetID, err := strconv.ParseUint(c.Param("asset_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid asset ID"})
 		return
 	}
-	if err := config.DB.Create(&history).Error; err != nil {
+
+	histories, err := ctrl.historyService.GetAssetHistories(uint(assetID))
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, history)
+
+	c.JSON(http.StatusOK, histories)
 }

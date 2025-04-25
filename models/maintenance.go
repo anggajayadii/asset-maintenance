@@ -27,8 +27,8 @@ type Maintenance struct {
 	UserID         uint              `json:"user_id"`
 	Status         MaintenanceStatus `gorm:"type:varchar(20);not null" json:"status"`
 	MaintType      MaintenanceType   `gorm:"type:enum('troubleshoot','preventive_maintenance');not null" json:"maint_type"`
-	Date           DateOnly          `json:"date"`            // ubah dari time.Time
-	CompletionDate *DateOnly         `json:"completion_date"` // ubah dari *time.Time
+	Date           string            `json:"date"`            // ubah dari time.Time
+	CompletionDate string            `json:"completion_date"` // ubah dari *time.Time
 
 	// Relations
 	Asset Asset `gorm:"foreignKey:AssetID"`
