@@ -14,7 +14,18 @@ const (
 	RoleEngineer Role = "engineer"
 	RoleLogistik Role = "logistik"
 	RoleManajer  Role = "manajer"
+	RoleAdmin    Role = "admin"
 )
+
+// IsValid memeriksa apakah role termasuk yang valid
+func (r Role) IsValid() bool {
+	switch r {
+	case RoleEngineer, RoleLogistik, RoleManajer, RoleAdmin:
+		return true
+	default:
+		return false
+	}
+}
 
 type User struct {
 	UserID    uint      `gorm:"primaryKey" json:"user_id"`

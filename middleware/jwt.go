@@ -1,43 +1,87 @@
 package middleware
 
 import (
+	"asset-maintenance/config"
+	"fmt"
 	"net/http"
 	"strings"
 
-	"asset-maintenance/utils" // Sesuaikan dengan path Anda
-
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
 )
 
 func JWTAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. Ambil token dari header
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Header Authorization diperlukan"})
-			return
-		}
-
-		// 2. Pisahkan Bearer dari token
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		// Extract token from header
+		tokenString := extractToken(c)
 		if tokenString == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Format token tidak valid"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "Authorization header is required in format: Bearer <token>",
+			})
 			return
 		}
 
-		// 3. Parse token
-		claims, err := utils.ParseToken(tokenString)
+		// Verify and parse the token
+		token, err := verifyToken(tokenString)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error":  "Token tidak valid",
+				"error":  "Invalid token",
 				"detail": err.Error(),
 			})
 			return
 		}
 
-		// 4. Set data user di context
-		c.Set("user_id", claims.UserID)
-		c.Set("role", claims.Role)
-		c.Next()
+		// Check if token is valid and get claims
+		if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+			setAuthContext(c, claims)
+			c.Next() // Proceed to the next handler
+		} else {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
+				"error": "Invalid token claims",
+			})
+			return
+		}
+	}
+}
+
+func extractToken(c *gin.Context) string {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		return ""
+	}
+
+	tokenParts := strings.Split(authHeader, " ")
+	if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+		return ""
+	}
+
+	return tokenParts[1]
+}
+
+func verifyToken(tokenString string) (*jwt.Token, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Validate the signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return config.JWTSecretKey, nil
+	})
+
+	return token, err
+}
+
+func setAuthContext(c *gin.Context, claims jwt.MapClaims) {
+	// Set user_id to context
+	if userID, ok := claims["user_id"].(float64); ok {
+		c.Set("user_id", uint(userID))
+	} else {
+		c.Set("user_id", nil)
+	}
+
+	// Set user_role to context
+	if role, ok := claims["role"].(string); ok {
+		c.Set("user_role", role)
+	} else {
+		c.Set("user_role", nil)
 	}
 }

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"asset-maintenance/constants"
 	"asset-maintenance/models"
 	"asset-maintenance/services"
 	"net/http"
@@ -139,6 +140,39 @@ func (ctrl *AssetController) GetAssetByID(c *gin.Context) {
 }
 
 func (ctrl *AssetController) CreateAsset(c *gin.Context) {
+	// Dapatkan role user dari context
+	userRole, exists := c.Get("user_role")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "role information not found"})
+		return
+	}
+
+	// Konversi ke type Role
+	role := constants.Role(userRole.(string))
+
+	// Cek apakah role diizinkan membuat asset
+	allowedRoles := []constants.Role{
+		constants.RoleLogistik,
+		constants.RoleAdmin,
+	}
+
+	roleAllowed := false
+	for _, allowedRole := range allowedRoles {
+		if role == allowedRole {
+			roleAllowed = true
+			break
+		}
+	}
+
+	if !roleAllowed {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":          "your role doesn't have permission to create assets",
+			"required_roles": allowedRoles,
+		})
+		return
+	}
+
+	// Lanjutkan proses create asset jika diizinkan
 	var input models.Asset
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -147,11 +181,14 @@ func (ctrl *AssetController) CreateAsset(c *gin.Context) {
 
 	userID := c.MustGet("user_id").(uint)
 	if err := ctrl.assetService.CreateAsset(&input, userID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, input)
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Asset created successfully",
+		"data":    input,
+	})
 }
 
 func (ctrl *AssetController) UpdateAsset(c *gin.Context) {

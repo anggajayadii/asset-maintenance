@@ -31,6 +31,9 @@ func main() {
 		log.Fatal("Migration failed: ", err)
 	}
 
+	// Initialize JWT configuration
+	config.InitJWTConfig()
+
 	router := gin.Default()
 	routes.RegisterRoutes(router)
 

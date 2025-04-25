@@ -43,3 +43,25 @@ func ConnectDatabase() {
 	DB = database
 	fmt.Println("✅ Koneksi ke database berhasil!")
 }
+
+var JWTSecretKey []byte
+
+func InitJWTConfig() {
+	// Load .env file
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	secret := os.Getenv("JWT_SECRET_KEY")
+	if secret == "" {
+		log.Fatal("JWT_SECRET_KEY environment variable not set")
+	}
+
+	if len(secret) < 32 {
+		log.Fatal("JWT secret key must be at least 32 characters long")
+	}
+
+	JWTSecretKey = []byte(secret)
+	log.Println("JWT secret key initialized")
+}

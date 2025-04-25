@@ -19,7 +19,7 @@ func RoleBasedAuth() gin.HandlerFunc {
 		currentPath := c.FullPath()
 		currentMethod := c.Request.Method
 
-		// Handle wildcard routes (e.g., /assets/:id)
+		// Handle wildcard routes
 		basePath := strings.Split(currentPath, "/:")[0]
 		if basePath != "" {
 			currentPath = basePath
@@ -27,10 +27,21 @@ func RoleBasedAuth() gin.HandlerFunc {
 
 		// Cek permission
 		allowed := false
-		for path, methods := range constants.RolePermissions[constants.Role(userRole.(string))] {
-			if strings.HasPrefix(c.Request.URL.Path, path) {
-				for _, m := range methods {
-					if m == currentMethod {
+		role := constants.Role(userRole.(string))
+
+		// Dapatkan permissions untuk role ini
+		permissions, ok := constants.RolePermissions[role]
+		if !ok {
+			c.AbortWithStatusJSON(http.StatusForbidden,
+				gin.H{"error": "role permissions not defined"})
+			return
+		}
+
+		// Cek semua path yang diizinkan
+		for path, methods := range permissions {
+			if strings.HasPrefix(currentPath, path) {
+				for _, method := range methods {
+					if method == currentMethod {
 						allowed = true
 						break
 					}
@@ -40,7 +51,12 @@ func RoleBasedAuth() gin.HandlerFunc {
 
 		if !allowed {
 			c.AbortWithStatusJSON(http.StatusForbidden,
-				gin.H{"error": "your role doesn't have permission"})
+				gin.H{
+					"error":         "your role doesn't have permission",
+					"required_role": role,
+					"path":          currentPath,
+					"method":        currentMethod,
+				})
 			return
 		}
 

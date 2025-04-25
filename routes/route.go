@@ -11,20 +11,38 @@ import (
 )
 
 func RegisterRoutes(router *gin.Engine) {
-	// Auth (Public)
+	// Initialize all repositories
+	userRepo := repositories.NewUserRepository(config.DB)
+	assetRepo := repositories.NewAssetRepository(config.DB)
+	maintRepo := repositories.NewMaintenanceRepository(config.DB)
+	historyRepo := repositories.NewAssetHistoryRepository(config.DB)
+
+	// Initialize services
+	userService := services.NewUserService(userRepo)
+	assetService := services.NewAssetService(assetRepo)
+	maintService := services.NewMaintenanceService(maintRepo)
+	historyService := services.NewAssetHistoryService(historyRepo)
+
+	// Initialize controllers
+	userController := controllers.NewUserController(userService)
+	assetController := controllers.NewAssetController(assetService)
+	maintController := controllers.NewMaintenanceController(maintService)
+	historyController := controllers.NewAssetHistoryController(historyService)
+
+	// Public routes (no auth required)
 	auth := router.Group("/auth")
 	{
 		auth.POST("/login", controllers.Login)
 		auth.POST("/register", controllers.Register)
 	}
 
-	// Users (Admin Only)
-	userRepo := repositories.NewUserRepository(config.DB)
-	userService := services.NewUserService(userRepo)
-	userController := controllers.NewUserController(userService)
+	// Protected routes
+	protected := router.Group("/")
+	protected.Use(middleware.JWTAuthMiddleware()) // Apply JWT auth to all protected routes
 
-	users := router.Group("/users")
-	users.Use(middleware.JWTAuthMiddleware(), middleware.RoleBasedAuth()) // Tambahkan RBAC
+	// User management (Admin only)
+	users := protected.Group("/users")
+	users.Use(middleware.RoleBasedAuth())
 	{
 		users.GET("/", userController.GetAllUsers)
 		users.GET("/:id", userController.GetUser)
@@ -32,13 +50,9 @@ func RegisterRoutes(router *gin.Engine) {
 		users.DELETE("/:id", userController.DeleteUser)
 	}
 
-	// Assets (Role-Specific)
-	assetRepo := repositories.NewAssetRepository(config.DB)
-	assetService := services.NewAssetService(assetRepo)
-	assetController := controllers.NewAssetController(assetService)
-
-	assets := router.Group("/assets")
-	assets.Use(middleware.JWTAuthMiddleware(), middleware.RoleBasedAuth()) // Tambahkan RBAC
+	// Asset management
+	assets := protected.Group("/assets")
+	assets.Use(middleware.RoleBasedAuth())
 	{
 		assets.GET("/", assetController.GetAssets)
 		assets.GET("/:id", assetController.GetAssetByID)
@@ -47,32 +61,19 @@ func RegisterRoutes(router *gin.Engine) {
 		assets.DELETE("/:id", assetController.DeleteAsset)
 	}
 
-	// Maintenance (Role-Specific)
-	maintRepo := repositories.NewMaintenanceRepository(config.DB)
-	maintService := services.NewMaintenanceService(maintRepo)
-	maintController := controllers.NewMaintenanceController(maintService)
-
-	maintenance := router.Group("/maintenance")
-	maintenance.Use(middleware.JWTAuthMiddleware(), middleware.RoleBasedAuth()) // Tambahkan RBAC
+	// Maintenance management
+	maintenance := protected.Group("/maintenance")
+	maintenance.Use(middleware.RoleBasedAuth())
 	{
 		maintenance.GET("/", maintController.GetRecords)
 		maintenance.GET("/:id", maintController.GetRecordByID)
 		maintenance.POST("/", maintController.CreateRecord)
 	}
 
-	// Inisialisasi
-	historyRepo := repositories.NewAssetHistoryRepository(config.DB)
-	historyService := services.NewAssetHistoryService(historyRepo)
-	historyController := controllers.NewAssetHistoryController(historyService)
-
-	// Tambahkan ke route
-	history := router.Group("/assets/:asset_id/history")
-	history.Use(middleware.JWTAuthMiddleware())
+	// Asset history
+	history := protected.Group("/asset-history")
 	{
 		history.GET("/", historyController.GetAssetHistories)
+		history.GET("/:asset_id", historyController.GetAssetHistories)
 	}
-
-	// In your router setup:
-	historyService := services.NewAssetHistoryService(repositories.NewAssetHistoryRepository(db))
-	router.Use(middleware.AssetHistoryMiddleware(historyService))
 }

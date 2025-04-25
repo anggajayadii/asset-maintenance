@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"asset-maintenance/models"
+	"asset-maintenance/config"
 	"os"
 	"time"
 
@@ -15,19 +15,19 @@ type Claims struct {
 }
 
 // Ubah parameter role dari string ke models.Role
-func GenerateToken(userID uint, role models.Role) (string, error) {
-	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
+func GenerateToken(userID uint, role string) (string, time.Time, error) {
+	expirationTime := time.Now().Add(24 * time.Hour)
 
-	claims := &Claims{
-		UserID: userID,
-		Role:   string(role), // Konversi ke string
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-		},
+	claims := jwt.MapClaims{
+		"user_id": userID,
+		"role":    role,
+		"exp":     expirationTime.Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(jwtSecret)
+	tokenString, err := token.SignedString(config.JWTSecretKey)
+
+	return tokenString, expirationTime, err
 }
 
 func ParseToken(tokenStr string) (*Claims, error) {
